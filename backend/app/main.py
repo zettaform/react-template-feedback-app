@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Request, Response
 from starlette.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -328,3 +329,11 @@ try:
 except Exception:
     # Don't crash if path not available; avatars list will be empty in that case
     pass
+
+# Fallback: if static directory is not available in Render build, redirect avatar requests to DiceBear
+@app.get("/dbz/{filename}")
+def get_avatar(filename: str):
+    # Strip extension to create a stable seed
+    seed = filename.rsplit('.', 1)[0]
+    dicebear_url = f"https://api.dicebear.com/7.x/adventurer/png?seed={seed}&size=128"
+    return RedirectResponse(url=dicebear_url, status_code=302)

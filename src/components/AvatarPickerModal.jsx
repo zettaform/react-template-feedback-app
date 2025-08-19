@@ -35,8 +35,8 @@ const AvatarPickerModal = ({ open, setOpen, onPicked, picking = false }) => {
           className="border rounded-lg p-2 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           title={a.replace('.png','')}
         >
-          {/* All avatar images are served from /dbz/<filename> under public/ */}
-          <img src={`/dbz/${a}`} alt={a} className="w-16 h-16 object-contain" />
+          {/* Avatars served by backend at /dbz/<filename> to avoid Netlify dependency */}
+          <img src={`${import.meta.env?.VITE_API_URL?.replace(/\/$/, '') || ''}/dbz/${a}`} alt={a} className="w-16 h-16 object-contain" />
         </button>
       ))}
     </div>

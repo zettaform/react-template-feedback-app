@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { buildAvatarUrl } from '../../services/api';
 import { authApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import AvatarPickerModal from '../../components/AvatarPickerModal';
@@ -58,7 +59,7 @@ function AccountPanel({ user }) {
           <div className="flex items-center">
             <div className="mr-4">
               {user?.avatar ? (
-                <img className="w-20 h-20 rounded-full" src={`/dbz/${user.avatar}`} width="80" height="80" alt="Avatar" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/fallback-avatar.svg'; }} />
+                <img className="w-20 h-20 rounded-full" src={user?.avatar ? buildAvatarUrl(user.avatar) : ''} width="80" height="80" alt="Avatar" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/fallback-avatar.svg'; }} />
               ) : (
                 <div className="w-20 h-20 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-200 text-xl font-medium">
                   {(user?.username || '?').slice(0, 1).toUpperCase()}

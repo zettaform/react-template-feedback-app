@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Request, Response
+from starlette.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -316,3 +317,14 @@ def admin_list_feedback(current_user: UserPublic = Depends(get_current_user)):
 @app.get("/")
 def root():
     return {"message": "Authentication API is running"}
+
+# Static files: serve avatar images from the repo's public/dbz directory
+try:
+    import os as _os
+    BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
+    AVATAR_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(BASE_DIR)), 'public', 'dbz')
+    if _os.path.isdir(AVATAR_DIR):
+        app.mount("/dbz", StaticFiles(directory=AVATAR_DIR), name="dbz")
+except Exception:
+    # Don't crash if path not available; avatars list will be empty in that case
+    pass

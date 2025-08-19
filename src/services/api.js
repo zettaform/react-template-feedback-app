@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 // Resolve backend base URL from environment
-// - In production (Netlify), set VITE_API_URL to your Render URL
-// - In local dev, leave unset to use same-origin proxy or manually set
-const API_URL = (import.meta.env?.VITE_API_URL || (typeof window !== 'undefined' ? window.__API_URL__ : '') || '')
+// Prefer VITE_API_URL, otherwise fall back to the deployed Render URL so the app works without Netlify envs
+const DEFAULT_API = 'https://react-template-fastapi.onrender.com';
+const API_URL = (import.meta.env?.VITE_API_URL || (typeof window !== 'undefined' ? window.__API_URL__ : '') || DEFAULT_API)
   .toString()
   .replace(/\/$/, '');
 
@@ -16,6 +16,14 @@ const api = axios.create({
   },
   withCredentials: false, // We're using token-based auth
 });
+
+// Export base URL for consumers that need to construct absolute asset URLs
+export const API_BASE = API_URL || '';
+
+export const buildAvatarUrl = (filename) => {
+  const base = (API_URL || '').replace(/\/$/, '');
+  return `${base}/dbz/${filename}`;
+};
 
 // Request interceptor
 api.interceptors.request.use(

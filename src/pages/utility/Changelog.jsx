@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import Sidebar from '../../partials/Sidebar';
 import Header from '../../partials/Header';
 import PaginationClassic from '../../components/PaginationClassic';
+import ModalBasic from '../../components/ModalBasic';
 
 import User01 from '../../images/user-32-01.jpg';
 import User02 from '../../images/user-32-02.jpg';
@@ -13,12 +14,36 @@ function Changelog() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState({
+    title: '',
+    category: 'Announcements',
+    date: new Date().toISOString().slice(0, 10),
+    author: 'System',
+    body: '',
+  });
+  const [userEntries, setUserEntries] = useState([]);
 
   const filters = ['All', 'Announcements', 'Bug Fix', 'Product', 'Exciting News'];
 
+  // Load persisted user entries
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('changelog_user_entries');
+      if (raw) setUserEntries(JSON.parse(raw));
+    } catch (e) {
+      console.warn('Failed to load changelog_user_entries', e);
+    }
+  }, []);
+
+  const allEntries = useMemo(() => {
+    // User entries first, then packaged entries
+    return [...userEntries, ...changelogData];
+  }, [userEntries]);
+
   const normalized = (cat) => (cat || '').toLowerCase();
   const filteredEntries = useMemo(() => {
-    if (activeFilter === 'All') return changelogData;
+    if (activeFilter === 'All') return allEntries;
     const map = {
       Announcements: 'announcement',
       'Bug Fix': 'bug fix',
@@ -26,8 +51,8 @@ function Changelog() {
       'Exciting News': 'exciting news',
     };
     const target = map[activeFilter];
-    return changelogData.filter(e => normalized(e.category) === target);
-  }, [activeFilter]);
+    return allEntries.filter(e => normalized(e.category) === target);
+  }, [activeFilter, allEntries]);
 
   // Sort descending by date
   const displayedEntries = useMemo(() => {
@@ -75,7 +100,7 @@ function Changelog() {
               <div className="grid grid-flow-col sm:auto-cols-max justify-start sm:justify-end gap-2">
 
                 {/* Add board button */}
-                <button className="btn bg-indigo-500 hover:bg-indigo-600 text-white">
+                <button className="btn bg-indigo-500 hover:bg-indigo-600 text-white" onClick={() => setAddOpen(true)}>
                   <svg className="w-4 h-4 fill-current opacity-50 shrink-0" viewBox="0 0 16 16">
                     <path d="M15 7H9V1c0-.6-.4-1-1-1S7 .4 7 1v6H1c-.6 0-1 .4-1 1s.4 1 1 1h6v6c0 .6.4 1 1 1s1-.4 1-1V9h6c.6 0 1-.4 1-1s-.4-1-1-1z" />
                   </svg>
@@ -160,6 +185,91 @@ function Changelog() {
 
               </div>
             </div>
+
+            {/* Add Entry Modal */}
+            <ModalBasic id="add-entry" modalOpen={addOpen} setModalOpen={setAddOpen} title="Add Changelog Entry">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const bodyArray = form.body
+                    .split(/\n\n|\n/)
+                    .map(s => s.trim())
+                    .filter(Boolean);
+                  const entry = {
+                    title: form.title.trim(),
+                    category: form.category,
+                    date: form.date,
+                    body: bodyArray,
+                    author: { name: form.author || 'System', avatar: 'user07' },
+                  };
+                  const next = [entry, ...userEntries];
+                  setUserEntries(next);
+                  try {
+                    localStorage.setItem('changelog_user_entries', JSON.stringify(next));
+                  } catch {}
+                  setAddOpen(false);
+                  setForm({ title: '', category: 'Announcements', date: new Date().toISOString().slice(0,10), author: 'System', body: '' });
+                }}
+              >
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Title<span className="text-rose-500">*</span></label>
+                    <input
+                      className="form-input w-full"
+                      required
+                      value={form.title}
+                      onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
+                      placeholder="Add a descriptive title"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Category</label>
+                      <select
+                        className="form-select w-full"
+                        value={form.category}
+                        onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))}
+                      >
+                        {filters.filter(f => f !== 'All').map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Date</label>
+                      <input
+                        type="date"
+                        className="form-input w-full"
+                        value={form.date}
+                        onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Author</label>
+                    <input
+                      className="form-input w-full"
+                      value={form.author}
+                      onChange={(e) => setForm(f => ({ ...f, author: e.target.value }))}
+                      placeholder="Your name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Body</label>
+                    <textarea
+                      className="form-textarea w-full min-h-[120px]"
+                      value={form.body}
+                      onChange={(e) => setForm(f => ({ ...f, body: e.target.value }))}
+                      placeholder={'Write your update...\nUse new lines to split paragraphs.'}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end space-x-3 mt-6">
+                  <button type="button" className="btn border-slate-200 dark:border-slate-700" onClick={() => setAddOpen(false)}>Cancel</button>
+                  <button type="submit" className="btn bg-indigo-500 hover:bg-indigo-600 text-white">Save Entry</button>
+                </div>
+              </form>
+            </ModalBasic>
 
           </div>
         </main>

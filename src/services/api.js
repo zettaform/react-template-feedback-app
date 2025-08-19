@@ -1,10 +1,15 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+// Resolve backend base URL from environment
+// - In production (Netlify), set VITE_API_URL to your Render URL
+// - In local dev, leave unset to use same-origin proxy or manually set
+const API_URL = (import.meta.env?.VITE_API_URL || (typeof window !== 'undefined' ? window.__API_URL__ : '') || '')
+  .toString()
+  .replace(/\/$/, '');
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_URL || '', // fallback to same-origin if not provided
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

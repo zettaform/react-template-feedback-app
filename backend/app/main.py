@@ -31,9 +31,20 @@ from .auth import (
 app = FastAPI(title="Authentication API")
 
 # Configure CORS
+"""
+CORS configuration
+Uses env var CORS_ORIGINS as a comma-separated list of allowed origins.
+Examples:
+  CORS_ORIGINS="https://your-site.netlify.app,https://www.your-site.com"
+If unset, defaults to "*" for development.
+"""
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").strip()
+_origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
+ALLOWED_ORIGINS = _origins if _origins else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5174"],  # Frontend URL
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,14 +55,21 @@ app.add_middleware(
 async def add_cors_headers(request: Request, call_next):
     response = await call_next(request)
     if request.method == "OPTIONS":
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5174"
-        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+        # Mirror the configured CORS origins for preflight responses
+        request_origin = request.headers.get("origin", "")
+        if "*" in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        elif request_origin in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = request_origin
+        elif ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+        response.headers["Access-Control-Allow-Methods"] = "POST, GET, PUT, PATCH, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.status_code = 200
     return response
 
 # Security configurations
-SECRET_KEY = "your-secret-key-here"  # In production, use environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-prod")  # In production, set via env var
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

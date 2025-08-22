@@ -8,6 +8,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from .database import get_user_by_username, get_user_by_email
+from .dynamodb_auth import dynamodb_auth
 from .models import TokenData, UserInDB
 
 # Security configurations (use env vars in real deployments)
@@ -30,10 +31,14 @@ def get_password_hash(password: str) -> str:
 
 
 def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
-    # Accept either username or email in the "username" form field
+    # First try DynamoDB authentication
+    user = dynamodb_auth.get_user_by_email(username)
+    if user and user.hashed_password == password:  # Direct password comparison for DynamoDB
+        return user
+    
+    # Fallback to CSV authentication
     user = get_user_by_username(username)
     if not user:
-        # Try by email if username lookup failed
         user = get_user_by_email(username)
         if not user:
             return None

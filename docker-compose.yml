@@ -8,3 +8,15 @@ services:
       - "5174:8000"
     environment:
       - PYTHONUNBUFFERED=1
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: feedback-frontend
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=http://localhost:5174

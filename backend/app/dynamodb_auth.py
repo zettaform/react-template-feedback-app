@@ -23,15 +23,15 @@ class DynamoDBAuth:
             
             customer = items[0]  # Take first match
             
-            # Since DynamoDB doesn't have password field, use customer_id as password
-            customer_id = customer.get('customer_id', '')
+            # Use the password field from DynamoDB
+            password = customer.get('password', '')
             
             # Map DynamoDB customer to UserInDB format
             return UserInDB(
                 username=customer.get('email', ''),  # Use email as username
                 email=customer.get('email', ''),
                 full_name=f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip(),
-                hashed_password=customer_id,  # Use customer_id as password
+                hashed_password=password,  # Use actual password field
                 disabled=False,
                 avatar='goku.png',  # Default avatar
                 onboarding_completed=True

@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    container_name: feedback-api
+    restart: always
+    ports:
+      - "5174:8000"
+    environment:
+      - PYTHONUNBUFFERED=1

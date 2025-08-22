@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import "datatables.net-dt/css/dataTables.dataTables.css";
+import DataTable from 'datatables.net-dt';
 import FeedbackTableItem from './FeedbackTableItem';
 
 function FeedbackTable({ selectedItems }) {
@@ -6,31 +8,39 @@ function FeedbackTable({ selectedItems }) {
   const [isCheck, setIsCheck] = useState([]);
   const [feedbackList, setFeedbackList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const tableRef = useRef(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchFeedback();
+    // eslint-disable-next-line
   }, []);
+
+  // Initialize DataTable when feedbackList changes
+  useEffect(() => {
+    if (tableRef.current) {
+      const dt = new DataTable(tableRef.current, {
+        paging: true,
+        searching: true,
+        ordering: true,
+        destroy: true,
+      });
+      return () => {
+        dt.destroy();
+      };
+    }
+  }, [feedbackList]);
 
   const fetchFeedback = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/admin/feedback', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setFeedbackList(data);
-      } else {
-        throw new Error('Failed to fetch feedback');
-      }
+      // Load feedback from localStorage instead of backend
+      const storedFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
+      setFeedbackList(storedFeedback);
     } catch (error) {
       console.error('Error fetching feedback:', error);
       setError('Failed to load feedback');
+      setFeedbackList([]);
     } finally {
       setLoading(false);
     }
@@ -118,7 +128,7 @@ function FeedbackTable({ selectedItems }) {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="table-auto w-full dark:text-slate-300">
+          <table ref={tableRef} className="table-auto w-full dark:text-slate-300">
             {/* Table header */}
             <thead className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/20 border-t border-b border-slate-200 dark:border-slate-700">
               <tr>

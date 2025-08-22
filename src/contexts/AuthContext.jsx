@@ -1,8 +1,39 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi } from '../services/api';
 
 const AuthContext = createContext(null);
+
+// Load users from CSV data
+let usersData = [];
+
+const loadUsers = async () => {
+  try {
+    const response = await fetch('/src/data/users.csv');
+    const csvText = await response.text();
+    const lines = csvText.trim().split('\n');
+    const headers = lines[0].split(',');
+    
+    usersData = lines.slice(1).map(line => {
+      const values = line.split(',');
+      const obj = {};
+      headers.forEach((header, index) => {
+        let value = values[index];
+        if (value === 'true') value = true;
+        if (value === 'false') value = false;
+        if (!isNaN(value) && value !== '' && header === 'id') value = Number(value);
+        obj[header] = value;
+      });
+      return obj;
+    });
+  } catch (error) {
+    console.error('Failed to load users:', error);
+    // Fallback users if CSV fails
+    usersData = [
+      { id: 1, username: 'john_doe', email: 'john@example.com', password: 'password123', full_name: 'John Doe', avatar: 'avatar1.png', onboarding_completed: true, role: 'user' },
+      { id: 2, username: 'admin_user', email: 'admin@example.com', password: 'admin123', full_name: 'Admin User', avatar: 'avatar3.png', onboarding_completed: true, role: 'admin' }
+    ];
+  }
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -14,34 +45,27 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (token) {
-          if (token === 'mock-jwt-token') {
-            // Handle mock user session
-            const mockUser = {
-              id: 'demo',
-              username: 'demo',
-              email: 'demo@example.com',
-              full_name: 'Demo User',
-              avatar: null,
-              role: 'user',
-              onboarding_completed: true,
-              onboarding: { complete: true, step: 4 }
-            };
-            setUser(mockUser);
+        const userId = localStorage.getItem('currentUserId');
+        
+        if (token && userId) {
+          // Load users if not already loaded
+          if (usersData.length === 0) {
+            await loadUsers();
+          }
+          
+          // Find current user
+          const user = usersData.find(u => u.id.toString() === userId);
+          if (user) {
+            setUser(user);
           } else {
-            // Try to get real user from backend
-            const userResponse = await authApi.getCurrentUser();
-            setUser({
-              ...userResponse,
-              id: userResponse.username,
-              avatar: userResponse.avatar || null,
-              onboarding_completed: !!userResponse.onboarding_completed,
-            });
+            localStorage.removeItem('token');
+            localStorage.removeItem('currentUserId');
           }
         }
       } catch (error) {
         console.error('Auth check error:', error);
-        authApi.logout();
+        localStorage.removeItem('token');
+        localStorage.removeItem('currentUserId');
       } finally {
         setLoading(false);
       }
@@ -52,137 +76,111 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (userData) => {
     try {
-      const response = await authApi.signup({
-        username: userData.email.split('@')[0], // Generate username from email
+      // Ensure users are loaded
+      if (usersData.length === 0) {
+        await loadUsers();
+      }
+      
+      // Check if email already exists
+      if (usersData.find(u => u.email === userData.email)) {
+        return { success: false, error: 'Email already exists' };
+      }
+      
+      // Create new user
+      const newUser = {
+        id: Math.max(...usersData.map(u => u.id)) + 1,
+        username: userData.email.split('@')[0],
         email: userData.email,
         password: userData.password,
-        full_name: userData.name
-      });
-
-      // Login after successful signup
-      const loginResponse = await authApi.login(userData.email, userData.password);
-      
-      // Get user data
-      const userResponse = await authApi.getCurrentUser();
-      
-      const newUser = {
-        ...userResponse,
-        id: userResponse.username, // Using username as ID
-        avatar: userResponse.avatar || null,
-        onboarding_completed: !!userResponse.onboarding_completed,
+        full_name: userData.name,
+        avatar: 'avatar1.png',
+        onboarding_completed: false,
+        role: 'user'
       };
-
+      
+      usersData.push(newUser);
+      localStorage.setItem('token', `token-${newUser.id}`);
+      localStorage.setItem('currentUserId', newUser.id.toString());
       setUser(newUser);
       return { success: true, user: newUser };
     } catch (error) {
       console.error('Signup error:', error);
-      return { success: false, error: error.message || 'Signup failed' };
+      return { success: false, error: 'Signup failed' };
     }
   };
 
   const signin = async (credentials) => {
     try {
-      // Try backend login first
-      await authApi.login(credentials.email, credentials.password);
-      const userResponse = await authApi.getCurrentUser();
+      // Ensure users are loaded
+      if (usersData.length === 0) {
+        await loadUsers();
+      }
       
-      const user = {
-        ...userResponse,
-        id: userResponse.username,
-        avatar: userResponse.avatar || null,
-        onboarding_completed: !!userResponse.onboarding_completed,
-      };
+      // Find user by email and password
+      const user = usersData.find(u => 
+        u.email === credentials.email && u.password === credentials.password
+      );
       
-      setUser(user);
-      return { success: true, user };
+      if (user) {
+        localStorage.setItem('token', `token-${user.id}`);
+        localStorage.setItem('currentUserId', user.id.toString());
+        setUser(user);
+        return { success: true, user };
+      } else {
+        return { success: false, error: 'Invalid email or password' };
+      }
     } catch (error) {
-      console.warn('Backend login failed, using mock user:', error.message);
-      
-      // Create mock user for demo purposes when backend is unavailable
-      const mockUser = {
-        id: credentials.email.split('@')[0],
-        username: credentials.email.split('@')[0],
-        email: credentials.email,
-        full_name: 'Demo User',
-        avatar: null,
-        role: credentials.email === 'admin@example.com' ? 'admin' : 'user',
-        onboarding_completed: true,
-        onboarding: { complete: true, step: 4 }
-      };
-      
-      // Store mock token
-      localStorage.setItem('token', 'mock-jwt-token');
-      setUser(mockUser);
-      return { success: true, user: mockUser };
+      console.error('Signin failed:', error);
+      return { success: false, error: 'Signin failed' };
     }
   };
 
   const signout = () => {
-    authApi.logout();
+    localStorage.removeItem('token');
+    localStorage.removeItem('currentUserId');
     setUser(null);
     navigate('/signin');
   };
 
   const updateUser = async (userData) => {
     try {
-      // Placeholder for future profile update endpoint
-      const refreshed = await authApi.getCurrentUser();
-      const mapped = {
-        ...refreshed,
-        id: refreshed.username,
-        avatar: refreshed.avatar || null,
-        onboarding_completed: !!refreshed.onboarding_completed,
-      };
-      setUser(mapped);
-      return mapped;
+      // Mock update - just update local state
+      const updated = { ...user, ...userData };
+      setUser(updated);
+      return updated;
     } catch (error) {
       console.error('Update user error:', error);
       throw error;
     }
   };
 
-  // Refresh user from backend
+  // Mock refresh user
   const refreshUser = async () => {
     try {
-      const refreshed = await authApi.getCurrentUser();
-      const mapped = {
-        ...refreshed,
-        id: refreshed.username,
-        avatar: refreshed.avatar || null,
-        onboarding_completed: !!refreshed.onboarding_completed,
-      };
-      setUser(mapped);
-      return mapped;
+      // Just return current user
+      return user;
     } catch (e) {
       console.error('Failed to refresh user', e);
       throw e;
     }
   };
 
-  // Change avatar via API and update state
+  // Mock change avatar
   const changeAvatar = async (avatar) => {
-    const updated = await authApi.updateAvatar(avatar);
-    setUser(prev => ({ ...prev, ...updated, id: updated.username, avatar: updated.avatar || null }));
+    const updated = { ...user, avatar };
+    setUser(updated);
     return updated;
   };
 
   const updateOnboardingStep = async (stepData) => {
-    // Keep client-side step progression if your UI needs it
-    // but do not persist; server is the source of truth for completion.
     return { success: true, user };
   };
   
   const completeOnboarding = async () => {
     try {
-      const updated = await authApi.completeOnboarding();
-      const mapped = {
-        ...updated,
-        id: updated.username,
-        avatar: updated.avatar || null,
-        onboarding_completed: !!updated.onboarding_completed,
-      };
-      setUser(mapped);
-      return { success: true, user: mapped };
+      const updated = { ...user, onboarding_completed: true };
+      setUser(updated);
+      return { success: true, user: updated };
     } catch (error) {
       console.error('Complete onboarding error:', error);
       return { success: false, error: error.message };

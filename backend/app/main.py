@@ -27,6 +27,7 @@ from .auth import (
     create_access_token as auth_create_access_token,
     get_current_user as auth_get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES as AUTH_TOKEN_EXPIRE_MINUTES,
+    create_refresh_token,
 )
 
 # Initialize FastAPI app
@@ -42,7 +43,11 @@ If unset, defaults to "*" for development.
 """
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").strip()
 _origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
-ALLOWED_ORIGINS = _origins if _origins else ["*"]
+# For development, default to Vite dev origins so cookies work with credentials
+ALLOWED_ORIGINS = _origins if _origins else [
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,14 +64,13 @@ async def add_cors_headers(request: Request, call_next):
     if request.method == "OPTIONS":
         # Mirror the configured CORS origins for preflight responses
         request_origin = request.headers.get("origin", "")
-        if "*" in ALLOWED_ORIGINS:
-            response.headers["Access-Control-Allow-Origin"] = "*"
-        elif request_origin in ALLOWED_ORIGINS:
+        if request_origin in ALLOWED_ORIGINS:
             response.headers["Access-Control-Allow-Origin"] = request_origin
         elif ALLOWED_ORIGINS:
             response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
         response.headers["Access-Control-Allow-Methods"] = "POST, GET, PUT, PATCH, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
         response.status_code = 200
     return response
 
@@ -166,7 +170,7 @@ async def signup(user: UserCreate):
     return user_data
 
 @app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -178,11 +182,63 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
+    # Issue refresh token cookie
+    refresh_token = create_refresh_token({"sub": user.username})
+    # Cookie options
+    secure_cookie = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+        max_age=60 * 60 * 24 * 30,  # 30 days
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/me/", response_model=UserPublic)
 async def read_users_me(current_user: UserPublic = Depends(get_current_user)):
     return current_user
+
+# Refresh access token using refresh_token cookie
+@app.post("/refresh", response_model=Token)
+async def refresh_access_token(request: Request, response: Response):
+    from jose import jwt, JWTError
+    from .auth import SECRET_KEY
+    try:
+        token = request.cookies.get("refresh_token")
+        if not token:
+            raise HTTPException(status_code=401, detail="Missing refresh token")
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        if payload.get("typ") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        username = payload.get("sub")
+        if not username or not get_user_by_username(username):
+            raise HTTPException(status_code=401, detail="User not found")
+        # Rotate refresh token
+        new_refresh = create_refresh_token({"sub": username})
+        secure_cookie = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+        response.set_cookie(
+            key="refresh_token",
+            value=new_refresh,
+            httponly=True,
+            secure=secure_cookie,
+            samesite="lax",
+            path="/",
+            max_age=60 * 60 * 24 * 30,
+        )
+        # Issue new access token
+        access = auth_create_access_token({"sub": username})
+        return {"access_token": access, "token_type": "bearer"}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+# Logout: clear refresh cookie
+@app.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("refresh_token", path="/")
+    return {"message": "Logged out"}
 
 # Mark onboarding complete for current user
 @app.post("/users/me/onboarding-complete")

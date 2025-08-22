@@ -47,7 +47,18 @@ function DropdownProfile({
         aria-expanded={dropdownOpen}
       >
         {user?.avatar ? (
-          <img className="w-8 h-8 rounded-full" src={user?.avatar ? buildAvatarUrl(user.avatar) : ''} width="32" height="32" alt="User" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/fallback-avatar.svg'; }} />
+          <img
+            className="w-8 h-8 rounded-full"
+            src={user?.avatar ? buildAvatarUrl(user.avatar) : ''}
+            width="32"
+            height="32"
+            alt="User"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              const seed = (user?.username || user?.email || 'user').split('@')[0];
+              e.currentTarget.src = `https://api.dicebear.com/7.x/adventurer/png?seed=${encodeURIComponent(seed)}&size=128`;
+            }}
+          />
         ) : (
           <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-200 text-xs font-medium">
             {(user?.username || user?.email || 'U').slice(0, 1).toUpperCase()}

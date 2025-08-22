@@ -55,6 +55,33 @@ function CustomersTableItem(props) {
       <td className="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
         <div className="text-center">{props.refunds}</div>
       </td>
+      {props.showExtraColumn && (
+        <td className="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+          <div className="text-left">
+            {props.extraData ? (
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Score: <span className="text-emerald-600 dark:text-emerald-400">{props.extraData.score}</span>
+                </div>
+                <div className="text-xs">
+                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                    props.extraData.status === 'Active' 
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300'
+                  }`}>
+                    {props.extraData.status}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Last: {props.extraData.lastActivity}
+                </div>
+              </div>
+            ) : (
+              <span className="text-slate-400 dark:text-slate-500 text-xs">Loading...</span>
+            )}
+          </div>
+        </td>
+      )}
       <td className="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap w-px">
         {/* Menu button */}
         <button className="text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400 rounded-full">

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { buildAvatarUrl } from '../services/api';
 import ModalBasic from './ModalBasic';
 import { authApi } from '../services/api';
 
@@ -35,8 +36,8 @@ const AvatarPickerModal = ({ open, setOpen, onPicked, picking = false }) => {
           className="border rounded-lg p-2 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           title={a.replace('.png','')}
         >
-          {/* Avatars served by backend at /dbz/<filename> to avoid Netlify dependency */}
-          <img src={`${import.meta.env?.VITE_API_URL?.replace(/\/$/, '') || ''}/dbz/${a}`} alt={a} className="w-16 h-16 object-contain" />
+          {/* Avatars served by backend helper to avoid Netlify dependency */}
+          <img src={buildAvatarUrl(a)} alt={a} className="w-16 h-16 object-contain" />
         </button>
       ))}
     </div>

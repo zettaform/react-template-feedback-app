@@ -20,27 +20,27 @@ function FeedbackPanel() {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          rating,
-          message: message.trim(),
-        }),
-      });
-
-      if (response.ok) {
-        setSubmitted(true);
-        setRating(0);
-        setMessage('');
-        setTimeout(() => setSubmitted(false), 3000);
-      } else {
-        throw new Error('Failed to submit feedback');
-      }
+      // Mock feedback submission - store locally
+      const feedback = {
+        id: Date.now(),
+        userId: user?.id,
+        username: user?.username,
+        rating,
+        message: message.trim(),
+        timestamp: new Date().toISOString(),
+      };
+      
+      // Store in localStorage for demo purposes
+      const existingFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
+      existingFeedback.push(feedback);
+      localStorage.setItem('feedback', JSON.stringify(existingFeedback));
+      
+      console.log('Feedback submitted:', feedback);
+      
+      setSubmitted(true);
+      setRating(0);
+      setMessage('');
+      setTimeout(() => setSubmitted(false), 3000);
     } catch (error) {
       console.error('Error submitting feedback:', error);
       alert('Failed to submit feedback. Please try again.');

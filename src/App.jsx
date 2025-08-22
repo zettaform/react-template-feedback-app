@@ -79,6 +79,11 @@ import AvatarPage from './pages/component/AvatarPage';
 import TooltipPage from './pages/component/TooltipPage';
 import AccordionPage from './pages/component/AccordionPage';
 import IconsPage from './pages/component/IconsPage';
+import DesignPage1 from './pages/design/Page1';
+import DesignPage2 from './pages/design/Page2';
+import DesignPage3 from './pages/design/Page3';
+import DesignPage4 from './pages/design/Page4';
+import DesignPage5 from './pages/design/Page5';
 
 // Import ProtectedRoute component
 import ProtectedRoute from './components/ProtectedRoute';
@@ -215,6 +220,13 @@ function App() {
           <Route path="/component/tooltip" element={<TooltipPage />} />
           <Route path="/component/accordion" element={<AccordionPage />} />
           <Route path="/component/icons" element={<IconsPage />} />
+
+          {/* Design */}
+          <Route path="/design/page-1" element={<DesignPage1 />} />
+          <Route path="/design/page-2" element={<DesignPage2 />} />
+          <Route path="/design/page-3" element={<DesignPage3 />} />
+          <Route path="/design/page-4" element={<DesignPage4 />} />
+          <Route path="/design/page-5" element={<DesignPage5 />} />
         </Route>
 
         {/* 404 - Keep at the bottom */}

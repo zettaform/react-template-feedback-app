@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Resolve backend base URL from environment
 // Prefer VITE_API_URL, otherwise fall back to the deployed Render URL so the app works without Netlify envs
-const DEFAULT_API = 'https://react-template-fastapi.onrender.com';
+const DEFAULT_API = 'http://127.0.0.1:8000';
 const API_URL = (import.meta.env?.VITE_API_URL || (typeof window !== 'undefined' ? window.__API_URL__ : '') || DEFAULT_API)
   .toString()
   .replace(/\/$/, '');
@@ -14,15 +14,15 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: false, // We're using token-based auth
+  withCredentials: true, // needed to send/receive refresh cookie across origins
 });
 
 // Export base URL for consumers that need to construct absolute asset URLs
 export const API_BASE = API_URL || '';
 
 export const buildAvatarUrl = (filename) => {
-  const base = (API_URL || '').replace(/\/$/, '');
-  return `${base}/dbz/${filename}`;
+  // Use local avatars from public folder
+  return `/avatars/${filename}`;
 };
 
 // Request interceptor
@@ -37,15 +37,12 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor
+// Response interceptor - simplified for CSV-based auth
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('token');
-      window.location.href = '/signin';
-    }
+  async (error) => {
+    // For CSV-based auth, we don't need complex refresh token logic
+    // Just pass through errors without automatic logout
     return Promise.reject(error);
   }
 );
@@ -99,7 +96,8 @@ export const authApi = {
   // Get current user
   getCurrentUser: async () => {
     try {
-      const response = await api.get('/users/me/');
+      // Avoid trailing slash to be compatible with common backends (FastAPI/Django)
+      const response = await api.get('/users/me');
       return response.data;
     } catch (error) {
       throw error.response?.data?.detail || 'Failed to fetch user';
@@ -108,8 +106,13 @@ export const authApi = {
 
   // Get list of available avatars
   getAvatars: async () => {
-    const res = await api.get('/avatars');
-    return res.data;
+    try {
+      const response = await fetch('/avatars/avatars.json');
+      return await response.json();
+    } catch (error) {
+      // Fallback avatar list
+      return ['avatar1.png', 'avatar2.png', 'avatar3.png', 'avatar4.png', 'avatar5.png'];
+    }
   },
 
   // Update current user's avatar
@@ -145,7 +148,9 @@ export const authApi = {
 
   // Logout user
   logout: () => {
+    // Clear access token and invalidate refresh cookie server-side
     localStorage.removeItem('token');
+    return api.post('/logout', null, { withCredentials: true }).catch(() => {});
   },
 
   // Check if user is authenticated
@@ -154,22 +159,49 @@ export const authApi = {
   },
 };
 
-// Admin API
+// Admin API - CSV-based implementation
 export const adminApi = {
   listUsers: async () => {
-    const res = await api.get('/admin/users');
-    return res.data;
+    try {
+      // Load users from CSV
+      const response = await fetch('/src/data/users.csv');
+      const csvText = await response.text();
+      const lines = csvText.trim().split('\n');
+      const headers = lines[0].split(',');
+      
+      const users = lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((header, index) => {
+          let value = values[index];
+          if (value === 'true') value = true;
+          if (value === 'false') value = false;
+          if (!isNaN(value) && value !== '' && header === 'id') value = Number(value);
+          obj[header] = value;
+        });
+        return obj;
+      });
+      
+      return users;
+    } catch (error) {
+      console.error('Failed to load users for admin:', error);
+      return [];
+    }
   },
   createUser: async ({ username, email, password, full_name, disabled = false, avatar = null }) => {
-    const res = await api.post('/admin/users', {
+    // For CSV-based system, we'll just return success
+    // In a real implementation, you'd append to the CSV or update the data source
+    console.log('Admin creating user:', { username, email, full_name, disabled, avatar });
+    return {
+      id: Date.now(),
       username,
       email,
-      password,
       full_name,
       disabled,
-      avatar,
-    });
-    return res.data;
+      avatar: avatar || 'avatar1.png',
+      onboarding_completed: false,
+      role: 'user'
+    };
   },
 };
 
